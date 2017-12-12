@@ -19,7 +19,7 @@ def get_url(url):
     sess.headers.update(headers)
     proxy = None
     try:
-        response = sess.get(url, proxies=proxy, timeout=10, verify=False)
+        response = sess.get(url, proxies=proxy, timeout=20, verify=False)
         # print(response.text)
         return response
     except Exception:
@@ -28,20 +28,25 @@ def get_url(url):
 
 def handle_page(page, i):
     p_j = {}
-    article_pattern = '<article class="post-content">(.+?)</article>'
-    article = re.findall(article_pattern, page.text, re.S)[0]
-    title = re.findall('<h1>([^<]+)</h1>', article, re.S)[0]
+    article=page.text
+    #print(article)
+    title = re.findall(r'<div class="entry-content notopmargin">\s+?<h3>(.+?)</h3>', article, re.S)[0]
     p_j['title'] = title
-    author = re.findall('<div id="authors" class="authors">(.+?)</div>', article, re.S)[0]
+    print(title)
+    author = re.findall(r'<strong>(.+?)</strong>', article, re.S)[0]
     author = ' '.join([e.strip() for e in author.split('\n') if e.strip() != ''])
     p_j['author'] = author
-    abstract = re.findall('<div id="abstract" class="abstract">(.+?)</div>', article, re.S)[0]
+    abstract_pdf = re.findall(r'<h4>Abstract</h4>\s+(<div .+?</div>)?\s+(.+?)<a href="(.+?)"', article, re.S)
+    abstract=abstract_pdf[0][1]
+    abstract = abstract.replace(r'<p>', '\n')
+    abstract = abstract.replace(r'</p>', '\n')
     abstract = abstract.replace(r'&lt;', '<')
     abstract = abstract.replace(r'&gt;', '>')
     abstract = abstract.replace(r'&le;', '\leq')
     abstract = abstract.replace(r'&ge;', '\geq')
-    p_j['abstract'] = abstract.replace('\n', '')
-    pdf = re.findall('<a href="([^"]+)" target="_blank" onclick="ga\(\'send\', \'event\', \'PDF Downloads\'', article, re.S)[0]
+    abstract = abstract.replace('\n', '\n\n')
+    p_j['abstract'] = abstract.strip()
+    pdf = abstract_pdf[0][2]
     p_j['pdf'] = pdf
     paper_j[i] = p_j
     with open('paper.json', 'w')as f:
@@ -53,16 +58,14 @@ def handle_fs(fs):
         if str(i + 1) in paper_j:
             continue
         page = get_url(a)
-        try:
-            handle_page(page, i + 1)
-        except Exception:
-            print('error',i)
+        
+        handle_page(page, i + 1)
         time.sleep(1)
         print(i)
 
 
 def handle_home(text):
-    pattern = '<a href="([^"]*)" class="btn btn-default btn-xs href_PDF" title="PDF">'
+    pattern = '<a href="(http://www.kdd.org/kdd2017/papers/view/[^"]+?)">'
     fs = re.findall(pattern, text)
     for a in fs:
         print(a)
@@ -74,7 +77,7 @@ if __name__ == '__main__':
     if os.path.exists('paper.json'):
         with open('paper.json')as f:
             paper_j = json.load(f)
-    url = "https://2017.icml.cc/Conferences/2017/Schedule?type=Poster"
+    url = "http://www.kdd.org/kdd2017/accepted-papers"
     response = get_url(url)
     fs = handle_home(response.text)
     handle_fs(fs)
